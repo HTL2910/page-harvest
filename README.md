@@ -90,6 +90,7 @@ page-harvest/
 │       └── extraction-lifecycle.png  # Rendered 2x PNG embedded in README
 └── tests/
     ├── xlsx.cjs              # Standalone Node test for HarvestXlsx.build()
+    ├── p0.test.cjs           # Zero-dependency Node regression suite (P0-1..P0-8)
     ├── test.cjs              # Playwright tests for HarvestExtract & HarvestXlsx
     ├── ui.cjs                # Playwright end-to-end UI flow against demo.html
     └── verify_workbooks.py   # Independent Python openpyxl workbook verification
@@ -131,11 +132,13 @@ page-harvest/
 
 Node.js 20+ (with Playwright for browser tests) and Python with `openpyxl` are required for automated verification, not for extension use.
 
-### Quick zero-dependency check (no `npm install` needed)
+### Quick zero-dependency checks (no `npm install` needed)
 
 ```sh
-node tests/xlsx.cjs
+npm run test:unit
 ```
+
+(`npm run test:unit` runs `node tests/xlsx.cjs && node --test tests/p0.test.cjs`.)
 
 ### Full test suite (from `package.json`)
 
@@ -150,7 +153,7 @@ python tests/verify_workbooks.py
 `npm test` executes:
 
 ```sh
-node tests/xlsx.cjs && node tests/test.cjs && node tests/ui.cjs
+node tests/xlsx.cjs && node --test tests/p0.test.cjs && node tests/test.cjs && node tests/ui.cjs
 ```
 
 Optional environment variables:

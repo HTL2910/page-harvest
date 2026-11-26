@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "description": "Local website extraction to XLSX",
-  "scripts": {"test": "node tests/xlsx.cjs && node tests/test.cjs && node tests/ui.cjs"},
+  "scripts": {
+    "test:unit": "node tests/xlsx.cjs && node --test tests/p0.test.cjs",
+    "test": "node tests/xlsx.cjs && node --test tests/p0.test.cjs && node tests/test.cjs && node tests/ui.cjs"
+  },
   "devDependencies": {"playwright": "1.62.1"}
 }

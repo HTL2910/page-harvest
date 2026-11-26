@@ -10,14 +10,56 @@
   </style><section class="panel" aria-label="Page Harvest"><header><div class="logo">↧</div><div class="brand"><strong>Page Harvest</strong><span class="sub">From webpage to spreadsheet.</span></div><button class="close" title="Close" aria-label="Close">×</button></header><div class="hint" hidden>Click one card or table cell. Press Esc to cancel.</div><div class="body"><p class="steps">01 SELECT &nbsp; / &nbsp; 02 REVIEW &nbsp; / &nbsp; 03 EXPORT</p><h2 class="intro">Collect the details that matter.</h2><p class="muted">Select one item. We’ll find similar items on this page and turn them into rows.</p><div class="actions"><button class="primary" id="pick">Select item on page</button><button id="scan" disabled>Refresh extraction</button></div><div class="status" role="status" aria-live="polite">Ready to select a product, article, or table cell.</div><div id="results" hidden><label class="label" for="group">Detected group</label><select id="group"></select><div class="stats"><div><strong id="rowcount">0</strong> <span>rows</span></div><div><strong id="colcount">0</strong> <span>columns selected</span></div></div><div class="label">Columns · rename or uncheck</div><div class="columns"></div><label class="dedup"><input type="checkbox" id="dedup"> Remove duplicate rows (using selected columns)</label><div class="tablewrap"><table><thead></thead><tbody></tbody></table></div><div class="footnote" id="previewnote"></div><div class="warning"></div></div></div><div class="footer"><span class="local">● Local processing · No account needed</span><button class="primary" id="export" disabled>Export .xlsx ↓</button></div></section>`;
   document.documentElement.append(host);
   const $=s=>shadow.querySelector(s), panel=$('.panel'),status=$('.status');
-  const outline=document.createElement('div');outline.style.cssText='position:fixed;pointer-events:none;z-index:2147483646;border:3px solid #25a56c;background:#25a56c20;display:none;box-sizing:border-box;';document.documentElement.append(outline);
+  const outline=document.createElement('div');
+  outline.style.cssText='all:initial!important;position:fixed!important;pointer-events:none!important;z-index:2147483646!important;border:3px solid #25a56c!important;background:#25a56c20!important;display:none!important;box-sizing:border-box!important;';
+  document.documentElement.append(outline);
   let selecting=false, anchor=null,groups=[],data=null,columns=[];
   function tell(message,error=false){status.textContent=message;status.classList.toggle('error',error)}
-  function stop(){selecting=false;panel.classList.remove('picking');$('.hint').hidden=true;outline.style.display='none';document.removeEventListener('pointermove',hover,true);document.removeEventListener('click',choose,true);document.removeEventListener('keydown',escape,true)}
-  function inPanel(event){return event.composedPath().includes(host)}
-  function hover(event){if(inPanel(event)){outline.style.display='none';return}const box=event.target.getBoundingClientRect();Object.assign(outline.style,{display:'block',left:box.left+'px',top:box.top+'px',width:box.width+'px',height:box.height+'px'})}
-  function escape(event){if(event.key==='Escape'){event.preventDefault();stop();tell('Selection cancelled.')}}
-  function choose(event){if(inPanel(event))return;event.preventDefault();event.stopImmediatePropagation();anchor=event.target;stop();detect()}
+  function hideOutline(){outline.style.setProperty('display','none','important')}
+  function showOutline(box){
+    outline.style.setProperty('display','block','important');
+    outline.style.setProperty('left',box.left+'px','important');
+    outline.style.setProperty('top',box.top+'px','important');
+    outline.style.setProperty('width',box.width+'px','important');
+    outline.style.setProperty('height',box.height+'px','important');
+  }
+  function clearResults(){
+    data=null;columns=[];
+    $('#results').hidden=true;
+    $('#export').disabled=true;
+    $('.columns').replaceChildren();
+    $('thead').replaceChildren();
+    $('tbody').replaceChildren();
+    $('#rowcount').textContent='0';
+    $('#colcount').textContent='0';
+    $('#previewnote').textContent='';
+    $('.warning').textContent='';
+  }
+  function stop(){
+    selecting=false;panel.classList.remove('picking');$('.hint').hidden=true;hideOutline();
+    document.removeEventListener('pointermove',hover,true);
+    document.removeEventListener('pointerdown',swallow,true);
+    document.removeEventListener('mousedown',swallow,true);
+    document.removeEventListener('click',choose,true);
+    document.removeEventListener('keydown',onKeyDown,true);
+  }
+  function inPanel(event){return typeof event.composedPath==='function' && event.composedPath().includes(host)}
+  function swallow(event){
+    if(inPanel(event))return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }
+  function hover(event){
+    if(inPanel(event)||!(event.target instanceof Element)){hideOutline();return}
+    showOutline(event.target.getBoundingClientRect());
+  }
+  function onKeyDown(event){if(event.key==='Escape'){event.preventDefault();stop();tell('Selection cancelled.')}}
+  function choose(event){
+    if(inPanel(event))return;
+    event.preventDefault();event.stopImmediatePropagation();
+    if(!(event.target instanceof Element))return;
+    anchor=event.target;stop();detect();
+  }
   function detect(previous){
     try {
       if(!anchor?.isConnected)throw new Error('The selected item was removed. Select an item again.');
@@ -26,7 +68,7 @@
       for(let i=0;i<groups.length;i++){const option=document.createElement('option');option.value=i;option.textContent=groups[i].label;$('#group').append(option)}
       const matched=previous?groups.findIndex(g=>g.root===previous.root&&g.type===previous.type):-1;$('#group').value=matched>=0?matched:0;
       load();
-    }catch(e){data=null;$('#results').hidden=true;$('#export').disabled=true;$('#scan').disabled=true;tell(e.message,true)}
+    }catch(e){clearResults();$('#scan').disabled=true;tell(e.message,true)}
   }
   function load(){
     try{
@@ -36,7 +78,7 @@
       $('.columns').replaceChildren();
       columns.forEach((column,i)=>{const wrap=document.createElement('div');wrap.className='column';const check=document.createElement('input');check.type='checkbox';check.checked=true;check.setAttribute('aria-label','Include '+column.name);check.onchange=()=>{column.enabled=check.checked;render()};const input=document.createElement('input');input.type='text';input.value=column.name;input.maxLength=120;input.setAttribute('aria-label','Column '+(i+1)+' name');input.oninput=()=>{column.name=input.value;render()};wrap.append(check,input);$('.columns').append(wrap)});
       $('.warning').textContent=data.warnings.join(' ');tell('Review the detected group and columns before exporting.');render();
-    }catch(e){data=null;$('#export').disabled=true;tell(e.message,true)}
+    }catch(e){clearResults();tell(e.message,true)}
   }
   function selected(){
     const indices=columns.flatMap((c,i)=>c.enabled?[i]:[]),headers=indices.map(i=>columns[i].name.trim()||data.headers[i]);
@@ -50,7 +92,14 @@
     rows.slice(0,50).forEach((row,i)=>{const tr=document.createElement('tr');for(const value of [String(i+1),...row]){const td=document.createElement('td');td.textContent=value;td.title=value.slice(0,500);tr.append(td)}$('tbody').append(tr)});
     $('#previewnote').textContent=`Showing ${Math.min(50,rows.length)} of ${rows.length} rows. Export includes all ${rows.length} rows.`;$('#export').disabled=!headers.length||!rows.length;
   }
-  $('#pick').onclick=()=>{stop();selecting=true;panel.classList.add('picking');$('.hint').hidden=false;document.addEventListener('pointermove',hover,true);document.addEventListener('click',choose,true);document.addEventListener('keydown',escape,true)};
+  $('#pick').onclick=()=>{
+    stop();selecting=true;panel.classList.add('picking');$('.hint').hidden=false;
+    document.addEventListener('pointermove',hover,true);
+    document.addEventListener('pointerdown',swallow,true);
+    document.addEventListener('mousedown',swallow,true);
+    document.addEventListener('click',choose,true);
+    document.addEventListener('keydown',onKeyDown,true);
+  };
   $('#group').onchange=load;$('#dedup').onchange=render;
   $('#scan').onclick=()=>detect(groups[Number($('#group').value)]);
   $('#export').onclick=()=>{
@@ -60,5 +109,5 @@
     }catch(e){tell('Export failed: '+e.message,true)}
   };
   $('.close').onclick=()=>{stop();host.remove();outline.remove();delete globalThis.__pageHarvest};
-  globalThis.__pageHarvest={show(){host.style.display='block';if(selecting)stop()}};
+  globalThis.__pageHarvest={show(){host.style.setProperty('display','block','important');if(selecting)stop()}};
 })();
