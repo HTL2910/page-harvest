@@ -63,15 +63,14 @@ flowchart TD
     end
 
     Worker -->|"on error: chrome.tabs.create"| ErrHtml
-    Worker -->|"chrome.scripting.executeScript: extractor.js, xlsx.js, panel.js"| Panel
 
     subgraph TabWorld["Active Tab (Isolated World)"]
         Panel["panel.js (Closed Shadow DOM UI, __pageHarvest)"]
         Extractor["extractor.js (HarvestExtract: candidates, extract)"]
-        Xlsx["xlsx.js (HarvestXlsx: build, zip, crc)"]
+        Xlsx["xlsx.js (HarvestXlsx.build; internal zip, crc)"]
         PageDOM["Active Page Top-Level Light DOM"]
 
-        Panel -->|"capture pointermove, click, Escape"| PageDOM
+        Panel -->|"capture pointermove, click, keydown (Escape)"| PageDOM
         Panel -->|"HarvestExtract.candidates(anchor)"| Extractor
         Panel -->|"HarvestExtract.extract(group)"| Extractor
         Extractor -->|"tableData / fieldMap DOM read"| PageDOM
@@ -79,6 +78,7 @@ flowchart TD
         Xlsx -->|"Uint8Array (.xlsx bytes)"| Panel
     end
 
+    Worker -->|"chrome.scripting.executeScript: extractor.js, xlsx.js, panel.js"| Panel
     Panel -->|"Blob + URL.createObjectURL + anchor download"| Download["Local .xlsx File Download"]
 ```
 
