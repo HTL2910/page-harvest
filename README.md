@@ -51,77 +51,15 @@ Alternatively, run `python -m http.server 8000` in this folder and visit `http:/
 
 Page Harvest has zero build steps and zero runtime dependencies. Clicking the toolbar icon triggers `worker.js` via `activeTab` and injects `extractor.js`, `xlsx.js`, and `panel.js` into the active tab’s isolated content-script world using `chrome.scripting.executeScript`. If injection fails (for example on browser settings pages or `file://` without permission), `worker.js` opens `error.html` with the encoded error message in the URL fragment.
 
-```mermaid
-flowchart TD
-    User["User clicks toolbar icon"] --> Action["Browser Action (activeTab)"]
-    Action -->|"chrome.action.onClicked"| Worker["worker.js (MV3 Service Worker)"]
+![Page Harvest component architecture showing Toolbar Action invoking worker.js to inject panel.js, extractor.js, and xlsx.js into the active tab isolated world for DOM extraction and local XLSX Blob download, or opening error.html on error](docs/diagrams/architecture.png)
 
-    subgraph ExtFallback["Error Fallback Page"]
-        ErrHtml["error.html (styled by demo.css)"]
-        ErrJs["error.js (decodes location.hash into #detail)"]
-        ErrHtml --> ErrJs
-    end
-
-    Worker -->|"on error: chrome.tabs.create"| ErrHtml
-
-    subgraph TabWorld["Active Tab (Isolated World)"]
-        Panel["panel.js (Closed Shadow DOM UI, __pageHarvest)"]
-        Extractor["extractor.js (HarvestExtract: candidates, extract)"]
-        Xlsx["xlsx.js (HarvestXlsx.build; internal zip, crc)"]
-        PageDOM["Active Page Top-Level Light DOM"]
-
-        Panel -->|"capture pointermove, click, keydown (Escape)"| PageDOM
-        Panel -->|"HarvestExtract.candidates(anchor)"| Extractor
-        Panel -->|"HarvestExtract.extract(group)"| Extractor
-        Extractor -->|"tableData / fieldMap DOM read"| PageDOM
-        Panel -->|"HarvestXlsx.build(headers, rows)"| Xlsx
-        Xlsx -->|"Uint8Array (.xlsx bytes)"| Panel
-    end
-
-    Worker -->|"chrome.scripting.executeScript: extractor.js, xlsx.js, panel.js"| Panel
-    Panel -->|"Blob + URL.createObjectURL + anchor download"| Download["Local .xlsx File Download"]
-```
+[Open interactive HTML diagram (`docs/diagrams/architecture.html`)](docs/diagrams/architecture.html)
 
 ## Extraction & Export Lifecycle
 
-```mermaid
-sequenceDiagram
-    actor User
-    participant Worker as worker.js
-    participant Error as error.html / error.js
-    participant Panel as panel.js (Closed Shadow DOM)
-    participant Extractor as extractor.js (HarvestExtract)
-    participant Xlsx as xlsx.js (HarvestXlsx)
+![Page Harvest extraction and export lifecycle sequence diagram from toolbar click through restricted-tab error fallback or script injection, DOM item selection, candidate group detection, field extraction, deduplication, HarvestXlsx.build, and local XLSX Blob download](docs/diagrams/extraction-lifecycle.png)
 
-    User->>Worker: Click toolbar icon (activeTab)
-
-    alt Restricted tab or executeScript error
-        Worker->>Error: chrome.tabs.create(error.html#encodedError)
-        Error-->>User: Display guidance and decoded #detail
-    else Injectable page
-        Worker->>Panel: chrome.scripting.executeScript(extractor.js, xlsx.js, panel.js)
-        Panel-->>User: Open panel (or __pageHarvest.show if already mounted)
-        User->>Panel: Click "Select item on page" (#pick)
-        Panel-->>User: Enter picking mode and highlight hovered DOM element
-        User->>Panel: Click repeated card or table cell (Esc cancels)
-        Panel->>Extractor: HarvestExtract.candidates(anchor)
-        Extractor-->>Panel: Candidate groups (table + up to 12 ancestor levels)
-        Panel->>Extractor: HarvestExtract.extract(selectedGroup)
-        Extractor-->>Panel: headers, rows, warnings via tableData or fieldMap
-        Panel-->>User: Populate #group, column controls, and 50-row preview
-
-        opt Refine or refresh extraction
-            User->>Panel: Switch #group, rename/uncheck columns, toggle #dedup, or click #scan
-            Panel->>Extractor: Re-run candidates/extract when #scan or #group changes
-            Panel-->>User: Re-render counts and preview table
-        end
-
-        User->>Panel: Click "Export .xlsx" (#export)
-        Panel->>Xlsx: HarvestXlsx.build(headers, rows)
-        Xlsx-->>Panel: Stored ZIP/OOXML Uint8Array (inlineStr, frozen header, autoFilter)
-        Panel-->>User: Trigger Blob download (page-harvest-host-YYYY-MM-DD.xlsx) and revoke URL after 30s
-    end
-```
+[Open interactive HTML diagram (`docs/diagrams/extraction-lifecycle.html`)](docs/diagrams/extraction-lifecycle.html)
 
 ## Project structure
 
@@ -144,7 +82,12 @@ page-harvest/
 ├── docs/
 │   ├── design.md             # Product & architecture specification
 │   ├── plan.md               # Implementation plan
-│   └── preview.png           # Browser-captured panel preview
+│   ├── preview.png           # Browser-captured panel preview
+│   └── diagrams/
+│       ├── architecture.html         # Interactive component architecture diagram
+│       ├── architecture.png          # Rendered 2x PNG embedded in README
+│       ├── extraction-lifecycle.html # Interactive extraction & export sequence diagram
+│       └── extraction-lifecycle.png  # Rendered 2x PNG embedded in README
 └── tests/
     ├── xlsx.cjs              # Standalone Node test for HarvestXlsx.build()
     ├── test.cjs              # Playwright tests for HarvestExtract & HarvestXlsx
@@ -160,6 +103,7 @@ page-harvest/
 | `xlsx.js` | Dependency-free ZIP/OOXML export (`HarvestXlsx.build`) |
 | `demo.html`, `demo.css` | Local test page and shared stylesheet |
 | `error.html`, `error.js` | Help page when a page cannot be accessed |
+| `docs/diagrams/` | Editorial HTML/SVG architecture & lifecycle diagrams and 2x PNG exports |
 | `tests/` | Extraction, UI, and openpyxl workbook checks |
 
 ## What it supports
